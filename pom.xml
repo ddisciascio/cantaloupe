@@ -99,6 +99,26 @@
       <version>${janino.version}</version>
     </dependency>
     <dependency>
+      <groupId>org.datanucleus</groupId>
+      <artifactId>javax.jdo</artifactId>
+      <version>3.2.0-m3</version>
+    </dependency>
+    <dependency>
+      <groupId>org.datanucleus</groupId>
+      <artifactId>datanucleus-core</artifactId>
+      <version>(4.1, 4.9)</version>
+    </dependency>
+    <dependency>
+      <groupId>org.datanucleus</groupId>
+      <artifactId>datanucleus-api-jdo</artifactId>
+      <version>[4.2.0-release, 4.9)</version>
+    </dependency>
+    <dependency>
+      <groupId>org.datanucleus</groupId>
+      <artifactId>datanucleus-rdbms</artifactId>
+      <version>(4.1, 4.9)</version>
+    </dependency>
+    <dependency>
       <groupId>org.im4java</groupId>
       <artifactId>im4java</artifactId>
       <version>${im4java.version}</version>
@@ -231,6 +251,25 @@
             <phase>package</phase>
             <goals>
               <goal>single</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.datanucleus</groupId>
+        <artifactId>datanucleus-maven-plugin</artifactId>
+        <version>4.0.1</version>
+        <configuration>
+          <api>JDO</api>
+          <!-- <props>${basedir}/datanucleus.properties</props>
+          <log4jConfiguration>${basedir}/log4j.properties</log4jConfiguration> -->
+          <verbose>true</verbose>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>process-classes</phase>
+            <goals>
+              <goal>enhance</goal>
             </goals>
           </execution>
         </executions>

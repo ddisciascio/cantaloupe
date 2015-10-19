@@ -177,8 +177,8 @@ cache.client.must_revalidate = false
 cache.client.proxy_revalidate = false
 cache.client.no_transform = true
 
-# The only available value is `FilesystemCache`. Comment out or set blank
-# to disable caching.
+# Available values are `FilesystemCache` and `JdoCache`. Comment out or set
+# blank to disable caching.
 #cache.server = FilesystemCache
 
 ###
@@ -193,15 +193,14 @@ FilesystemCache.pathname = /var/cache/cantaloupe
 FilesystemCache.ttl_seconds = 2592000
 
 ###
-# JdbcCache
+# JdoCache
 ###
 
-JdbcCache.connection_string = jdbc:postgresql://localhost:5432/cantaloupe
-JdbcCache.user = alexd
-JdbcCache.password =
-JdbcCache.image_table = image_cache
-JdbcCache.info_table = info_cache
-JdbcCache.ttl_seconds = 10
+JdoCache.driver = org.postgresql.Driver
+JdoCache.connection_string = jdbc:postgresql://localhost:5432/cantaloupe
+JdoCache.user = username
+JdoCache.password = password
+JdoCache.ttl_seconds = 10
 
 ###############
 # LOGGING
