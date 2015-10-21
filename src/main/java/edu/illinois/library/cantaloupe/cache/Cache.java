@@ -9,13 +9,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * Interface to be implemented by all caches. Instances will be shared
- * Singletons.
+ * Interface to be implemented by all caches. Implementation instances will be
+ * Singletons and must be thread-safe.
  */
 public interface Cache {
 
     /**
-     * Deletes the entire cache contents. Must be thread-safe.
+     * Deletes the entire contents of the cache.
      *
      * @throws IOException
      */
@@ -38,7 +38,12 @@ public interface Cache {
     void flushExpired() throws IOException;
 
     /**
-     * @param params IIIF request parameters
+     * <p>Attempts to return a stream for reading a cached image.</p>
+     *
+     * <p>If a cached image corresponding to the given parameters exists
+     * but is expired, implementations should delete it and return null.</p>
+     *
+     * @param params Request parameters
      * @return An input stream corresponding to the given parameters, or null
      * if a non-expired image corresponding to the given parameters does not
      * exist in the cache.
@@ -46,9 +51,12 @@ public interface Cache {
     InputStream getImageInputStream(Parameters params);
 
     /**
-     * Reads cached dimension information.
+     * <p>Attempts to read and return cached dimension information.</p>
      *
-     * @param identifier IIIF identifier
+     * <p>If a cached dimension corresponding to the given identifier exists
+     * but is expired, implementations should delete it and return null.</p>
+     *
+     * @param identifier Image identifier
      * @return Dimension corresponding to the given identifier, or null if no
      * non-expired dimension exists in the cache.
      */

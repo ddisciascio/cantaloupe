@@ -3,7 +3,6 @@ package edu.illinois.library.cantaloupe.cache;
 import edu.illinois.library.cantaloupe.request.Parameters;
 
 import javax.jdo.PersistenceManager;
-import javax.jdo.PersistenceManagerFactory;
 import javax.jdo.Transaction;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -16,28 +15,29 @@ class JdoImageOutputStream extends OutputStream {
 
     private ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     private Parameters params;
-    private PersistenceManagerFactory pmFactory;
+    private PersistenceManager persistenceManager;
 
-    public JdoImageOutputStream(PersistenceManagerFactory pmf,
-                                Parameters params) {
-        this.pmFactory = pmf;
+    public JdoImageOutputStream(PersistenceManager pm, Parameters params) {
+        this.persistenceManager = pm;
         this.params = params;
     }
 
     @Override
     public void close() throws IOException {
-        PersistenceManager pm = pmFactory.getPersistenceManager();
+        Transaction tx = persistenceManager.currentTransaction();
         try {
-            Transaction tx = pm.currentTransaction();
             tx.begin();
             Image image = new Image();
             image.setImage(outputStream.toByteArray());
             image.setParameters(params);
-            pm.makePersistent(image);
+            persistenceManager.makePersistent(image);
             tx.commit();
         } finally {
+            if (tx.isActive()) {
+                tx.rollback();
+            }
             outputStream.close();
-            pm.close();
+            persistenceManager.close();
         }
     }
 

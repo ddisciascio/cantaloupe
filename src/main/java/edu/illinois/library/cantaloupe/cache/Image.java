@@ -2,10 +2,13 @@ package edu.illinois.library.cantaloupe.cache;
 
 import edu.illinois.library.cantaloupe.request.Parameters;
 
+import javax.jdo.annotations.Column;
 import javax.jdo.annotations.IdGeneratorStrategy;
+import javax.jdo.annotations.Index;
 import javax.jdo.annotations.PersistenceCapable;
 import javax.jdo.annotations.Persistent;
 import javax.jdo.annotations.PrimaryKey;
+import javax.jdo.annotations.Unique;
 import java.util.Date;
 
 @PersistenceCapable(table = "cantaloupe_image_cache")
@@ -14,16 +17,23 @@ class Image {
     @PrimaryKey
     @Persistent(valueStrategy = IdGeneratorStrategy.INCREMENT)
     private long id;
-    private Parameters parameters;
+
+    @Persistent @Index @Unique @Column(jdbcType = "VARCHAR", length = 4096)
+    private String parameters;
+
+    @Persistent @Column(jdbcType = "BINARY")
     private byte[] image;
-    private Date lastUpdated = new Date();
+
+    @Persistent(customValueStrategy = "timestamp")
+    @Index @Column(name = "last_modified", jdbcType = "TIMESTAMP")
+    private Date lastModified;
 
     public Parameters getParameters() {
-        return parameters;
+        return Parameters.fromUri(parameters);
     }
 
     public void setParameters(Parameters parameters) {
-        this.parameters = parameters;
+        this.parameters = parameters.toString();
     }
 
     public byte[] getImage() {
@@ -34,12 +44,12 @@ class Image {
         this.image = image;
     }
 
-    public Date getLastUpdated() {
-        return lastUpdated;
+    public Date getLastModified() {
+        return lastModified;
     }
 
-    public void setLastUpdated(Date lastUpdated) {
-        this.lastUpdated = lastUpdated;
+    public void setLastModifieed(Date lastModified) {
+        this.lastModified = lastModified;
     }
 
 }
