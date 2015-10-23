@@ -160,8 +160,10 @@ class JdoCache implements Cache {
             if (!results.isEmpty()) {
                 ImageInfo info = results.get(0);
                 if (info.getLastModified().before(oldestValidDate())) {
+                    logger.debug("Deleting stale dimension: {}", identifier);
                     pm.deletePersistent(info);
                 } else {
+                    logger.debug("Hit for dimension: {}", identifier);
                     dimension = new Dimension(info.getWidth(), info.getHeight());
                 }
             }
@@ -183,8 +185,10 @@ class JdoCache implements Cache {
             if (!results.isEmpty()) {
                 Image image = (Image) results.get(0);
                 if (image.getLastModified().before(oldestValidDate())) {
+                    logger.debug("Deleting stale image: {}", params);
                     pm.deletePersistent(image);
                 } else {
+                    logger.debug("Hit for image: {}", params);
                     bais = new ByteArrayInputStream(image.getImage());
                 }
             }
@@ -207,6 +211,7 @@ class JdoCache implements Cache {
         PersistenceManager pm = getPersistenceManagerFactory().getPersistenceManager();
         Transaction tx = pm.currentTransaction();
         try {
+            logger.debug("Caching dimension: {}", identifier);
             ImageInfo info = new ImageInfo();
             info.setIdentifier(identifier.toString());
             info.setWidth(dimension.width);
