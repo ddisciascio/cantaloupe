@@ -1,10 +1,10 @@
 package edu.illinois.library.cantaloupe.cache;
 
 import edu.illinois.library.cantaloupe.Application;
+import edu.illinois.library.cantaloupe.CantaloupeTestCase;
 import edu.illinois.library.cantaloupe.request.Identifier;
 import edu.illinois.library.cantaloupe.request.Parameters;
 import edu.illinois.library.cantaloupe.test.TestUtil;
-import junit.framework.TestCase;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.io.FileUtils;
 
@@ -18,7 +18,7 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.List;
 
-public class JdoCacheTest extends TestCase {
+public class JdoCacheTest extends CantaloupeTestCase {
 
     JdoCache instance;
 
@@ -28,8 +28,6 @@ public class JdoCacheTest extends TestCase {
     }
 
     public void setUp() throws IOException {
-        System.setProperty("java.awt.headless", "true");
-
         BaseConfiguration config = new BaseConfiguration();
         // use an in-memory H2 database
         config.setProperty("JdoCache.driver", "org.h2.Driver");
