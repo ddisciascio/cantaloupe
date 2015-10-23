@@ -1,22 +1,17 @@
 package edu.illinois.library.cantaloupe.cache;
 
 import javax.jdo.annotations.Column;
-import javax.jdo.annotations.IdGeneratorStrategy;
 import javax.jdo.annotations.Index;
 import javax.jdo.annotations.PersistenceCapable;
 import javax.jdo.annotations.Persistent;
 import javax.jdo.annotations.PrimaryKey;
-import javax.jdo.annotations.Unique;
 import java.util.Date;
 
 @PersistenceCapable(table = "cantaloupe_info_cache")
 class ImageInfo {
 
-    @PrimaryKey
-    @Persistent(valueStrategy= IdGeneratorStrategy.INCREMENT)
-    private long id;
 
-    @Persistent @Index @Unique @Column(jdbcType = "VARCHAR", length = 4096)
+    @PrimaryKey @Persistent
     private String identifier;
 
     @Persistent
@@ -26,7 +21,7 @@ class ImageInfo {
     private int height;
 
     @Persistent(customValueStrategy = "timestamp")
-    @Index @Column(name = "last_modified", jdbcType = "TIMESTAMP")
+    @Index @Column(name = "last_modified")
     private Date lastModified;
 
     public int getHeight() {

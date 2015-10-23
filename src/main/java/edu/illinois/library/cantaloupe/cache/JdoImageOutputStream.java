@@ -9,7 +9,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 /**
- * Buffers written image data and persists it via JDO when closed.
+ * Buffers written image data and flushes it to a JDO PersistenceManager.
  */
 class JdoImageOutputStream extends OutputStream {
 
@@ -24,6 +24,15 @@ class JdoImageOutputStream extends OutputStream {
 
     @Override
     public void close() throws IOException {
+        outputStream.close();
+        if (!persistenceManager.isClosed()) {
+            persistenceManager.close();
+        }
+    }
+
+    @Override
+    public void flush() throws IOException {
+        outputStream.flush();
         Transaction tx = persistenceManager.currentTransaction();
         try {
             tx.begin();
@@ -36,14 +45,7 @@ class JdoImageOutputStream extends OutputStream {
             if (tx.isActive()) {
                 tx.rollback();
             }
-            outputStream.close();
-            persistenceManager.close();
         }
-    }
-
-    @Override
-    public void flush() throws IOException {
-        outputStream.flush();
     }
 
     @Override
