@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="Cantaloupe">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="http">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="port" type="xs:positiveInteger"/>
+              <xs:element name="generateHttpsLinks" type="xs:boolean"/>
+              <xs:element name="auth">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="class" type="xs:string"/>
+                    <xs:element name="BasicAuthenticator">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="username" type="xs:string"/>
+                          <xs:element name="secret" type="xs:string"/>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="contentDisposition">
+                <xs:complexType>
+                  <xs:choice>
+                    <xs:element name="inline"/>
+                    <xs:element name="attachment"/>
+                    <xs:element name="none"/>
+                  </xs:choice>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="cacheControl">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="enabled" type="xs:boolean"/>
+                    <xs:element name="maxAge" type="xs:integer"/>
+                    <xs:element name="sharedMaxAge" type="xs:integer"/>
+                    <xs:element name="public" type="xs:boolean"/>
+                    <xs:element name="private" type="xs:boolean"/>
+                    <xs:element name="noCache" type="xs:boolean"/>
+                    <xs:element name="noStore" type="xs:boolean"/>
+                    <xs:element name="mustRevalidate" type="xs:boolean"/>
+                    <xs:element name="proxyRevalidate" type="xs:boolean"/>
+                    <xs:element name="noTransform" type="xs:boolean"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="printStackTraceOnErrorPages" type="xs:boolean"/>
+        <xs:element name="resolvers">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="class" type="xs:string"/>
+              <xs:element name="AmazonS3Resolver">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="accessKeyId" type="xs:string"/>
+                    <xs:element name="secretKey" type="xs:string"/>
+                    <xs:element name="bucket">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="name" type="xs:string"/>
+                          <xs:element name="region" type="xs:string"/>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="FilesystemResolver">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="pathPrefix" type="xs:string"/>
+                    <xs:element name="pathSuffix" type="xs:string"/>
+                    <xs:element name="pathSeparator" type="xs:string"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="HttpResolver">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="urlPrefix" type="xs:string"/>
+                    <xs:element name="urlSuffix" type="xs:string"/>
+                    <xs:element name="pathSeparator" type="xs:string"/>
+                    <xs:element name="auth">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="httpBasic">
+                            <xs:complexType>
+                              <xs:sequence>
+                                <xs:element name="username" type="xs:string"/>
+                                <xs:element name="secret" type="xs:string"/>
+                              </xs:sequence>
+                            </xs:complexType>
+                          </xs:element>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="JdbcResolver">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="connection">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="string" type="xs:string"/>
+                          <xs:element name="user" type="xs:string"/>
+                          <xs:element name="password" type="xs:string"/>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element name="identifierFunction" type="xs:string"/>
+                    <xs:element name="mediaTypeFunction" type="xs:string"/>
+                    <xs:element name="lookupSql" type="xs:string"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="processors">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="assignments">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="class" minOccurs="0" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:simpleContent>
+                          <xs:extension base="xs:string">
+                            <xs:attribute name="format" type="xs:string" use="required"/>
+                          </xs:extension>
+                        </xs:simpleContent>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element name="fallbackClass">
+                      <xs:simpleType>
+                        <xs:restriction base="xs:token">
+                          <xs:enumeration value="FfmpegProcessor"/>
+                          <xs:enumeration value="GraphicsMagickProcessor"/>
+                          <xs:enumeration value="ImageMagickProcessor"/>
+                          <xs:enumeration value="JaiProcessor"/>
+                          <xs:enumeration value="Java2dProcessor"/>
+                          <xs:enumeration value="KakaduProcessor"/>
+                        </xs:restriction>
+                      </xs:simpleType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="FfmpegProcessor">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="pathToBinaries" type="xs:string"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="GraphicsMagickProcessor">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="pathToBinaries" type="xs:string"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="ImageMagickProcessor">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="pathToBinaries" type="xs:string"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="Java2dProcessor">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="jpegQuality" type="xs:string"/>
+                    <xs:element name="tiffReader" type="xs:string"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="KakaduProcessor">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="pathToBinaries" type="xs:string"/>
+                    <xs:element name="pathToStdoutSymlink" type="xs:string"/>
+                    <xs:element name="postProcessor" type="xs:string"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="caches">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="class" type="xs:string"/>
+              <xs:element name="FilesystemCache">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="pathname" type="xs:string"/>
+                    <xs:element name="ttlSeconds" type="xs:positiveInteger"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="JdbcCache">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="connection">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="string" type="xs:string"/>
+                          <xs:element name="user" type="xs:string"/>
+                          <xs:element name="password" type="xs:string"/>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element name="imageTable" type="xs:string"/>
+                    <xs:element name="infoTable" type="xs:string"/>
+                    <xs:element name="ttlSeconds" type="xs:positiveInteger"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="logging">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="applicationLog">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="level" type="xs:string"/>
+                    <xs:element name="ConsoleAppender">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="enabled" type="xs:boolean"/>
+                          <xs:element name="pattern" type="xs:string"/>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element name="FileAppender">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="enabled" type="xs:boolean"/>
+                          <xs:element name="pathname" type="xs:string"/>
+                          <xs:element name="pattern" type="xs:string"/>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element name="RollingFileAppender">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="enabled" type="xs:boolean"/>
+                          <xs:element name="pathname" type="xs:string"/>
+                          <xs:element name="pattern" type="xs:string"/>
+                          <xs:element name="policy" type="xs:string"/>
+                          <xs:element name="TimeBasedRollingPolicy">
+                            <xs:complexType>
+                              <xs:sequence>
+                                <xs:element name="filenamePattern" type="xs:string"/>
+                                <xs:element name="maxHistory" type="xs:positiveInteger"/>
+                              </xs:sequence>
+                            </xs:complexType>
+                          </xs:element>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="accessLog">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="ConsoleAppender">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="enabled" type="xs:boolean"/>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element name="FileAppender">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="enabled" type="xs:boolean"/>
+                          <xs:element name="pathname" type="xs:string"/>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element name="RollingFileAppender">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="enabled" type="xs:boolean"/>
+                          <xs:element name="pathname" type="xs:string"/>
+                          <xs:element name="policy" type="xs:string"/>
+                          <xs:element name="TimeBasedRollingPolicy">
+                            <xs:complexType>
+                              <xs:sequence>
+                                <xs:element name="filenamePattern" type="xs:string"/>
+                                <xs:element name="maxHistory" type="xs:positiveInteger"/>
+                              </xs:sequence>
+                            </xs:complexType>
+                          </xs:element>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Sample Cantaloupe configuration file
+
+Copy this file to `config.xml` and edit as desired. Then, launch
+Cantaloupe with the `-Dcantaloupe.config=config.xml` option.
+-->
+<Cantaloupe>
+  <http>
+    <port>8182</port>
+    <generateHttpsLinks>false</generateHttpsLinks>
+    <auth>
+      <class>BasicAuthenticator</class>
+      <BasicAuthenticator>
+        <username>myself</username>
+        <secret>password</secret>
+      </BasicAuthenticator>
+    </auth>
+    <contentDisposition>
+      <inline/>
+    </contentDisposition>
+    <cacheControl>
+      <enabled>true</enabled>
+      <maxAge>2592000</maxAge>
+      <sharedMaxAge>0</sharedMaxAge>
+      <public>true</public>
+      <private>false</private>
+      <noCache>false</noCache>
+      <noStore>false</noStore>
+      <mustRevalidate>false</mustRevalidate>
+      <proxyRevalidate>false</proxyRevalidate>
+      <noTransform>true</noTransform>
+    </cacheControl>
+  </http>
+  <printStackTraceOnErrorPages>true</printStackTraceOnErrorPages>
+  <resolvers>
+    <class>FilesystemResolver</class>
+    <AmazonS3Resolver>
+      <accessKeyId></accessKeyId>
+      <secretKey></secretKey>
+      <bucket>
+        <name></name>
+        <region></region>
+      </bucket>
+    </AmazonS3Resolver>
+    <FilesystemResolver>
+      <pathPrefix>/home/myself/images</pathPrefix>
+      <pathSuffix></pathSuffix>
+      <pathSeparator></pathSeparator>
+    </FilesystemResolver>
+    <HttpResolver>
+      <urlPrefix>http://localhost/images/</urlPrefix>
+      <urlSuffix></urlSuffix>
+      <pathSeparator></pathSeparator>
+      <auth>
+        <httpBasic>
+          <username></username>
+          <secret></secret>
+        </httpBasic>
+      </auth>
+    </HttpResolver>
+    <JdbcResolver>
+      <connection>
+        <string>jdbc:postgresql://localhost:5432/my_database</string>
+        <user>postgres</user>
+        <password>postgres</password>
+      </connection>
+      <identifierFunction>
+        function getDatabaseIdentifier(urlIdentifier) {
+            // return the un-altered identifier
+            return urlIdentifier;
+            // if the identifiers were stored in the database as
+            // "identifier-something", we would return this instead:
+            // return urlIdentifier + "-something";
+        }
+      </identifierFunction>
+      <mediaTypeFunction>
+        function getMediaType() {
+            return "SELECT media_type " +
+                "FROM item " +
+                "WHERE filename = ?";
+        }
+      </mediaTypeFunction>
+      <lookupSql>
+        SELECT image
+        FROM item
+        WHERE filename = ?
+      </lookupSql>
+    </JdbcResolver>
+  </resolvers>
+  <processors>
+    <assignments>
+      <class format="avi">FfmpegProcessor</class>
+      <class format="jpg">ImageMagickProcessor</class>
+      <class format="jp2">KakaduProcessor</class>
+      <class format="mov">FfmpegProcessor</class>
+      <class format="mp4">FfmpegProcessor</class>
+      <class format="tif">GraphicsMagickProcessor</class>
+      <class format="webm">FfmpegProcessor</class>
+      <fallbackClass>Java2dProcessor</fallbackClass>
+    </assignments>
+    <FfmpegProcessor>
+      <pathToBinaries>/usr/local/bin</pathToBinaries>
+    </FfmpegProcessor>
+    <GraphicsMagickProcessor>
+      <pathToBinaries>/usr/local/bin</pathToBinaries>
+    </GraphicsMagickProcessor>
+    <ImageMagickProcessor>
+      <pathToBinaries>/usr/local/bin</pathToBinaries>
+    </ImageMagickProcessor>
+    <Java2dProcessor>
+      <jpegQuality>0.7f</jpegQuality>
+      <tiffReader>TIFFImageReader</tiffReader>
+    </Java2dProcessor>
+    <KakaduProcessor>
+      <pathToBinaries>/usr/local/bin</pathToBinaries>
+      <pathToStdoutSymlink>/path/to/stdout.ppm</pathToStdoutSymlink>
+      <postProcessor>java2d</postProcessor>
+    </KakaduProcessor>
+  </processors>
+  <caches>
+    <class>FilesystemCache</class>
+    <FilesystemCache>
+      <pathname>/var/cache/cantaloupe</pathname>
+      <ttlSeconds>2592000</ttlSeconds>
+    </FilesystemCache>
+    <JdbcCache>
+      <connection>
+        <string>jdbc:postgresql://localhost:5432/cantaloupe</string>
+        <user>postgres</user>
+        <password></password>
+      </connection>
+      <imageTable>image_cache</imageTable>
+      <infoTable>info_cache</infoTable>
+      <ttlSeconds>2592000</ttlSeconds>
+    </JdbcCache>
+  </caches>
+  <logging>
+    <applicationLog>
+      <level>debug</level>
+      <ConsoleAppender>
+        <enabled>true</enabled>
+        <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+      </ConsoleAppender>
+      <FileAppender>
+        <enabled>false</enabled>
+        <pathname>/path/to/logs/cantaloupe.log</pathname>
+        <pattern>%date %level [%thread] %logger{10} [%file:%line] %msg%n</pattern>
+      </FileAppender>
+      <RollingFileAppender>
+        <enabled>false</enabled>
+        <pathname>/path/to/logs/cantaloupe.log</pathname>
+        <pattern>%date %level [%thread] %logger{10} [%file:%line] %msg%n</pattern>
+        <policy>TimeBasedRollingPolicy</policy>
+        <TimeBasedRollingPolicy>
+          <filenamePattern>/path/to/logs/cantaloupe-%d{yyyy-MM-dd}.log</filenamePattern>
+          <maxHistory>30</maxHistory>
+        </TimeBasedRollingPolicy>
+      </RollingFileAppender>
+    </applicationLog>
+    <accessLog>
+      <ConsoleAppender>
+        <enabled>true</enabled>
+      </ConsoleAppender>
+      <FileAppender>
+        <enabled>false</enabled>
+        <pathname>/path/to/logs/access.log</pathname>
+      </FileAppender>
+      <RollingFileAppender>
+        <enabled>false</enabled>
+        <pathname>/path/to/logs/access.log</pathname>
+        <policy>TimeBasedRollingPolicy</policy>
+        <TimeBasedRollingPolicy>
+          <filenamePattern>/path/to/logs/access-%d{yyyy-MM-dd}.log</filenamePattern>
+          <maxHistory>30</maxHistory>
+        </TimeBasedRollingPolicy>
+      </RollingFileAppender>
+    </accessLog>
+  </logging>
+</Cantaloupe>
