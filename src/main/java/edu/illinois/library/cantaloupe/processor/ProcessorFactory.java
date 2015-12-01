@@ -17,6 +17,7 @@ public abstract class ProcessorFactory {
         // might be preferable to scan the package for classes implementing
         // Processor, but might also not be worth the hassle
         Set<Processor> processors = new HashSet<>();
+        processors.add(new ExactImageProcessor());
         processors.add(new FfmpegProcessor());
         processors.add(new GraphicsMagickProcessor());
         processors.add(new ImageMagickProcessor());

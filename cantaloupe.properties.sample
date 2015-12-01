@@ -132,7 +132,8 @@ AmazonS3Resolver.bucket.name =
 
 # Image processors to use for various source formats. Available values are
 # `Java2dProcessor`, `GraphicsMagickProcessor`, `ImageMagickProcessor`,
-# `KakaduProcessor`, `JaiProcessor`, and `FfmpegProcessor`.
+# `KakaduProcessor`, `JaiProcessor`, `ExactImageProcessor`, and
+# `FfmpegProcessor`.
 
 # These extension-specific definitions are optional.
 processor.avi = FfmpegProcessor
@@ -145,6 +146,13 @@ processor.webm = FfmpegProcessor
 
 # Fall back to this processor for any formats not assigned above.
 processor.fallback = Java2dProcessor
+
+###
+# ExactImageProcessor
+###
+
+# Optional; overrides the PATH
+#ExactImageProcessor.path_to_binaries = /usr/local/bin
 
 ###
 # FfmpegProcessor
