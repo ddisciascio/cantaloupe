@@ -32,8 +32,8 @@ import java.util.Set;
 
 /**
  * Processor using the econvert and eidentify tools from the
- * <a href="http://www.exactcode.com/opensource/exactimage/">ExactImage
- * toolkit</a>.
+ * <a href="http://www.exactcode.com/opensource/exactimage/">ExactImage</a>
+ * toolkit.
  */
 class ExactImageProcessor implements FileProcessor {
 
@@ -64,6 +64,9 @@ class ExactImageProcessor implements FileProcessor {
 
     private static final String BINARIES_PATH_CONFIG_KEY =
             "ExactImageProcessor.path_to_binaries";
+    private static final String QUALITY_CONFIG_KEY =
+            "ExactImageProcessor.quality";
+
     private static final Set<ProcessorFeature> SUPPORTED_FEATURES =
             new HashSet<>();
     private static final Set<edu.illinois.library.cantaloupe.resource.iiif.v1_1.Quality>
@@ -119,9 +122,7 @@ class ExactImageProcessor implements FileProcessor {
             sourceFormats.add(SourceFormat.JPG);
             sourceFormats.add(SourceFormat.PNG);
             sourceFormats.add(SourceFormat.TIF);
-            outputFormats.add(OutputFormat.GIF);
             outputFormats.add(OutputFormat.JPG);
-            outputFormats.add(OutputFormat.PNG);
             outputFormats.add(OutputFormat.TIF);
             supportedFormats = new HashMap<>();
             for (SourceFormat sourceFormat : sourceFormats) {
@@ -184,7 +185,7 @@ class ExactImageProcessor implements FileProcessor {
             throw new UnsupportedSourceFormatException(sourceFormat);
         }
 
-        final String glue = "|";
+        final String glue = ",";
         final List<String> command = new ArrayList<>();
         command.add(getPath("edentify"));
         command.add("--format");
@@ -320,42 +321,44 @@ class ExactImageProcessor implements FileProcessor {
         command.add(getPath("econvert"));
         command.add("--input");
         command.add(inputArg); // TODO: use format hint
-        command.add("--output");
-        command.add("jpeg:-");
 
         for (Operation op : ops) {
             if (op instanceof Crop) {
-                Crop crop = (Crop) op;
+                final Crop crop = (Crop) op;
                 if (!crop.isFull()) {
                     Rectangle cropArea = crop.getRectangle(fullSize);
-                    // don't give an out-of-bounds crop area (is this necessary?)
-                    //cropArea.width = Math.min(cropArea.width, fullSize.width - cropArea.x);
-                    //cropArea.height = Math.min(cropArea.height, fullSize.height - cropArea.y);
                     command.add("--crop");
                     command.add(String.format("%d,%d,%d,%d", cropArea.x,
                             cropArea.y, cropArea.width, cropArea.height));
                 }
             } else if (op instanceof Scale) {
-                Scale scale = (Scale) op;
+                final Scale scale = (Scale) op;
                 if (scale.getMode() != Scale.Mode.FULL) {
-                    command.add("--size");
                     if (scale.getMode() == Scale.Mode.ASPECT_FIT_WIDTH) {
-                        // TODO: write this
+                        command.add("--size");
+                        double hScale = scale.getWidth() / (double) fullSize.width;
+                        command.add(String.format("%dx%d", scale.getWidth(),
+                                Math.round(fullSize.height * hScale)));
                     } else if (scale.getMode() == Scale.Mode.ASPECT_FIT_HEIGHT) {
-                        // TODO: write this
+                        command.add("--size");
+                        double vScale = scale.getHeight() / (double) fullSize.height;
+                        command.add(String.format("%dx%d",
+                                Math.round(fullSize.height * vScale),
+                                scale.getHeight()));
                     } else if (scale.getMode() == Scale.Mode.ASPECT_FIT_INSIDE) {
+                        command.add("--size");
                         // TODO: write this
                     } else if (scale.getMode() == Scale.Mode.NON_ASPECT_FILL) {
+                        command.add("--size");
                         command.add(String.format("%dx%d", scale.getWidth(),
                                 scale.getHeight()));
                     } else if (scale.getPercent() != 0) {
-                        int width = Math.round(fullSize.width * scale.getPercent());
-                        int height = Math.round(fullSize.height * scale.getPercent());
-                        command.add(String.format("%dx%d", width, height));
+                        command.add("--scale");
+                        command.add(scale.getPercent() + "");
                     }
                 }
             } else if (op instanceof Transpose) {
-                Transpose transpose = (Transpose) op;
+                final Transpose transpose = (Transpose) op;
                 switch (transpose) {
                     case HORIZONTAL:
                         command.add("--flop");
@@ -365,28 +368,50 @@ class ExactImageProcessor implements FileProcessor {
                         break;
                 }
             } else if (op instanceof Rotate) {
-                Rotate rotate = (Rotate) op;
+                final Rotate rotate = (Rotate) op;
                 if (rotate.getDegrees() > 0) {
                     command.add("--rotate");
                     command.add(rotate.getDegrees() + "");
+                    // TODO: need to expand canvas
                 }
             } else if (op instanceof Filter) {
-                Filter filter = (Filter) op;
+                final Filter filter = (Filter) op;
                 switch (filter) {
                     case BITONAL:
                         command.add("--colorspace");
                         command.add("BILEVEL");
+                        break;
                     case GRAY:
                         command.add("--colorspace");
                         command.add("GRAY");
+                        break;
                 }
             }
         }
 
+        command.add("--background");
+        command.add("white");
+        command.add("--quality");
+        command.add(Application.getConfiguration().
+                getFloat(QUALITY_CONFIG_KEY, 0.7f) + "");
+
         command.add("--output");
-        command.add(ops.getOutputFormat().getExtension() + ":-"); // TODO: extension won't work
+        command.add(getExactImageFormatName(ops.getOutputFormat()) + ":-");
 
         return new ProcessBuilder(command);
+    }
+
+    private String getExactImageFormatName(OutputFormat outputFormat) {
+        String name = null;
+        switch (outputFormat) {
+            case JPG:
+                name = "jpeg";
+                break;
+            case TIF:
+                name = "tiff";
+                break;
+        }
+        return name;
     }
 
 }
