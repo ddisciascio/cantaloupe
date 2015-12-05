@@ -1,6 +1,7 @@
 package edu.illinois.library.cantaloupe.resource.iiif.v2_0;
 
 import java.awt.Dimension;
+import java.io.FileNotFoundException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -9,6 +10,10 @@ import java.util.Set;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import edu.illinois.library.cantaloupe.Application;
+import edu.illinois.library.cantaloupe.cache.Cache;
+import edu.illinois.library.cantaloupe.cache.CacheFactory;
+import edu.illinois.library.cantaloupe.resource.EndpointDisabledException;
 import edu.illinois.library.cantaloupe.resource.iiif.Feature;
 import edu.illinois.library.cantaloupe.ImageServerApplication;
 import edu.illinois.library.cantaloupe.image.Identifier;
@@ -26,6 +31,7 @@ import org.restlet.data.Preference;
 import org.restlet.data.Reference;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Get;
+import org.restlet.resource.ResourceException;
 
 /**
  * Handles IIIF information requests.
@@ -46,6 +52,15 @@ public class InformationResource extends AbstractResource {
         SUPPORTED_SERVICE_FEATURES.add(ServiceFeature.JSON_LD_MEDIA_TYPE);
     }
 
+    @Override
+    protected void doInit() throws ResourceException {
+        if (!Application.getConfiguration().
+                getBoolean("endpoint.iiif.2.0.enabled", true)) {
+            throw new EndpointDisabledException();
+        }
+        super.doInit();
+    }
+
     /**
      * Responds to IIIF Information requests.
      *
@@ -60,10 +75,25 @@ public class InformationResource extends AbstractResource {
         // Get the resolver
         Resolver resolver = ResolverFactory.getResolver();
         // Determine the format of the source image
-        SourceFormat sourceFormat = resolver.getSourceFormat(identifier);
+        SourceFormat sourceFormat = SourceFormat.UNKNOWN;
+        try {
+            // Determine the format of the source image
+            sourceFormat = resolver.getSourceFormat(identifier);
+        } catch (FileNotFoundException e) {
+            if (Application.getConfiguration().
+                    getBoolean(PURGE_MISSING_CONFIG_KEY, false)) {
+                // if the image was not found, purge it from the cache
+                final Cache cache = CacheFactory.getInstance();
+                if (cache != null) {
+                    cache.purge(identifier);
+                }
+            }
+            throw e;
+        }
         if (sourceFormat.equals(SourceFormat.UNKNOWN)) {
             throw new UnsupportedSourceFormatException();
         }
+
         // Obtain an instance of the processor assigned to that format in
         // the config file
         Processor proc = ProcessorFactory.getProcessor(sourceFormat);

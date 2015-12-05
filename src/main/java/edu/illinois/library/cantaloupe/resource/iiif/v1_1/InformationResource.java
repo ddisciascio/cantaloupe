@@ -1,13 +1,17 @@
 package edu.illinois.library.cantaloupe.resource.iiif.v1_1;
 
 import java.awt.Dimension;
+import java.io.FileNotFoundException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import edu.illinois.library.cantaloupe.Application;
 import edu.illinois.library.cantaloupe.ImageServerApplication;
+import edu.illinois.library.cantaloupe.cache.Cache;
+import edu.illinois.library.cantaloupe.cache.CacheFactory;
 import edu.illinois.library.cantaloupe.image.Filter;
 import edu.illinois.library.cantaloupe.image.Identifier;
 import edu.illinois.library.cantaloupe.image.OutputFormat;
@@ -17,11 +21,13 @@ import edu.illinois.library.cantaloupe.processor.ProcessorFactory;
 import edu.illinois.library.cantaloupe.processor.UnsupportedSourceFormatException;
 import edu.illinois.library.cantaloupe.resolver.Resolver;
 import edu.illinois.library.cantaloupe.resolver.ResolverFactory;
+import edu.illinois.library.cantaloupe.resource.EndpointDisabledException;
 import org.restlet.data.MediaType;
 import org.restlet.data.Preference;
 import org.restlet.data.Reference;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Get;
+import org.restlet.resource.ResourceException;
 
 /**
  * Handles IIIF Image API 1.1 information requests.
@@ -30,6 +36,15 @@ import org.restlet.resource.Get;
  * Requests</a>
  */
 public class InformationResource extends AbstractResource {
+
+    @Override
+    protected void doInit() throws ResourceException {
+        if (!Application.getConfiguration().
+                getBoolean("endpoint.iiif.1.1.enabled", true)) {
+            throw new EndpointDisabledException();
+        }
+        super.doInit();
+    }
 
     /**
      * Responds to information requests.
@@ -44,8 +59,22 @@ public class InformationResource extends AbstractResource {
         Identifier internalId = new Identifier(identifier);
         // Get the resolver
         Resolver resolver = ResolverFactory.getResolver();
-        // Determine the format of the source image
-        SourceFormat sourceFormat = resolver.getSourceFormat(internalId);
+        SourceFormat sourceFormat = SourceFormat.UNKNOWN;
+        try {
+            // Determine the format of the source image
+            sourceFormat = resolver.getSourceFormat(internalId);
+        } catch (FileNotFoundException e) {
+            if (Application.getConfiguration().
+                    getBoolean(PURGE_MISSING_CONFIG_KEY, false)) {
+                // if the image was not found, purge it from the cache
+                final Cache cache = CacheFactory.getInstance();
+                if (cache != null) {
+                    cache.purge(internalId);
+                }
+            }
+            throw e;
+        }
+
         if (sourceFormat.equals(SourceFormat.UNKNOWN)) {
             throw new UnsupportedSourceFormatException();
         }

@@ -24,8 +24,21 @@ http.content_disposition = inline
 # URI needs to override the local URI. Leave blank to use the default.
 base_uri =
 
+# Maximum number of image pixels to return in a single request, to prevent
+# overloading the server. Requests for more pixels than this will receive an
+# HTTP 4xx response. Comment out or set to 0 for no maximum.
+max_pixels = 400000000
+
 # Helpful in development
 print_stack_trace_on_error_pages = true
+
+###############
+# ENDPOINTS
+###############
+
+endpoint.iiif.1.1.enabled = true
+
+endpoint.iiif.2.0.enabled = true
 
 ###############
 # RESOLVERS
@@ -81,6 +94,13 @@ HttpResolver.auth.basic.secret =
 JdbcResolver.connection_string = jdbc:postgresql://localhost:5432/my_database
 JdbcResolver.user = postgres
 JdbcResolver.password = postgres
+
+# Maximum number of connections allowed in the connection pool. A good starting
+# point is (number of CPU cores * 2) + 1.
+JdbcResolver.max_pool_size = 10
+
+# Connection timeout in seconds.
+JdbcResolver.connection_timeout = 10
 
 # JavaScript function that takes in an unencoded identifier and returns the
 # value that will be used in prepared statements.
@@ -225,9 +245,15 @@ cache.client.no_transform = true
 # to disable caching.
 #cache.server = FilesystemCache
 
-# If true, the source image will be checked to make sure it exists before a
-# cached copy is returned. If false, the cached copy will be returned without
-# any checking. Resolving first is safer but slower.
+# If true, when the resolver reports that the requested source image has gone
+# missing, all cached information relating to it (if any) will be deleted.
+# Note: this is effectively always false when cache.server.resolve_first is
+# also false.
+cache.server.purge_missing = false
+
+# If true, the source image will be confirmed to exist before a cached copy is
+# returned. If false, the cached copy will be returned without any checking.
+# Resolving first is slower but safer.
 # Note: this has no effect with the IIIF 1.1 endpoint -- it is effectively
 # always true.
 cache.server.resolve_first = true
@@ -250,6 +276,13 @@ FilesystemCache.ttl_seconds = 2592000
 JdbcCache.connection_string = jdbc:postgresql://localhost:5432/cantaloupe
 JdbcCache.user = postgres
 JdbcCache.password =
+
+# Maximum number of connections allowed in the connection pool. A good starting
+# point is (number of CPU cores * 2) + 1.
+JdbcCache.max_pool_size = 10
+
+# Connection timeout in seconds.
+JdbcCache.connection_timeout = 10
 
 # These will be created automatically.
 JdbcCache.image_table = image_cache

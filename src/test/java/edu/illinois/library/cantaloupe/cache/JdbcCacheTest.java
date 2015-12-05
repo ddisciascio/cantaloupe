@@ -18,6 +18,7 @@ import java.awt.Dimension;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -102,27 +103,29 @@ public class JdbcCacheTest extends CantaloupeTestCase {
         instance.putDimension(new Identifier("dogs"), new Dimension(500, 300));
         instance.putDimension(new Identifier("bunnies"), new Dimension(350, 240));
 
-        // assert that the data has been seeded
-        String sql = String.format("SELECT COUNT(%s) AS count FROM %s;",
-                JdbcCache.IMAGE_TABLE_OPERATIONS_COLUMN,
-                config.getString(JdbcCache.IMAGE_TABLE_CONFIG_KEY));
-        PreparedStatement statement = JdbcCache.getConnection().prepareStatement(sql);
-        ResultSet resultSet = statement.executeQuery();
-        if (resultSet.next()) {
-            assertEquals(3, resultSet.getInt("count"));
-        } else {
-            fail();
-        }
+        try (Connection connection = JdbcCache.getConnection()) {
+            // assert that the data has been seeded
+            String sql = String.format("SELECT COUNT(%s) AS count FROM %s;",
+                    JdbcCache.IMAGE_TABLE_OPERATIONS_COLUMN,
+                    config.getString(JdbcCache.IMAGE_TABLE_CONFIG_KEY));
+            PreparedStatement statement = connection.prepareStatement(sql);
+            ResultSet resultSet = statement.executeQuery();
+            if (resultSet.next()) {
+                assertEquals(3, resultSet.getInt("count"));
+            } else {
+                fail();
+            }
 
-        sql = String.format("SELECT COUNT(%s) AS count FROM %s;",
-                JdbcCache.INFO_TABLE_IDENTIFIER_COLUMN,
-                config.getString(JdbcCache.INFO_TABLE_CONFIG_KEY));
-        statement = JdbcCache.getConnection().prepareStatement(sql);
-        resultSet = statement.executeQuery();
-        if (resultSet.next()) {
-            assertEquals(3, resultSet.getInt("count"));
-        } else {
-            fail();
+            sql = String.format("SELECT COUNT(%s) AS count FROM %s;",
+                    JdbcCache.INFO_TABLE_IDENTIFIER_COLUMN,
+                    config.getString(JdbcCache.INFO_TABLE_CONFIG_KEY));
+            statement = connection.prepareStatement(sql);
+            resultSet = statement.executeQuery();
+            if (resultSet.next()) {
+                assertEquals(3, resultSet.getInt("count"));
+            } else {
+                fail();
+            }
         }
     }
 
@@ -130,58 +133,96 @@ public class JdbcCacheTest extends CantaloupeTestCase {
      * Clears the persistent store.
      */
     public void tearDown() throws IOException {
-        instance.flush();
+        instance.purge();
     }
 
-    public void testFlush() throws Exception {
+    /* purge() */
+
+    public void testPurge() throws Exception {
         Configuration config = Application.getConfiguration();
 
-        instance.flush();
+        instance.purge();
 
-        // assert that the images and infos were flushed
-        String sql = String.format("SELECT COUNT(%s) AS count FROM %s",
-                JdbcCache.IMAGE_TABLE_OPERATIONS_COLUMN,
-                config.getString(JdbcCache.IMAGE_TABLE_CONFIG_KEY));
-        PreparedStatement statement = JdbcCache.getConnection().prepareStatement(sql);
-        ResultSet resultSet = statement.executeQuery();
-        resultSet.next();
-        assertEquals(0, resultSet.getInt("count"));
+        try (Connection connection = JdbcCache.getConnection()) {
+            // assert that the images and infos were purged
+            String sql = String.format("SELECT COUNT(%s) AS count FROM %s",
+                    JdbcCache.IMAGE_TABLE_OPERATIONS_COLUMN,
+                    config.getString(JdbcCache.IMAGE_TABLE_CONFIG_KEY));
+            PreparedStatement statement = connection.prepareStatement(sql);
+            ResultSet resultSet = statement.executeQuery();
+            resultSet.next();
+            assertEquals(0, resultSet.getInt("count"));
 
-        sql = String.format("SELECT COUNT(%s) AS count FROM %s",
-                JdbcCache.INFO_TABLE_IDENTIFIER_COLUMN,
-                config.getString(JdbcCache.INFO_TABLE_CONFIG_KEY));
-        statement = JdbcCache.getConnection().prepareStatement(sql);
-        resultSet = statement.executeQuery();
-        resultSet.next();
-        assertEquals(0, resultSet.getInt("count"));
+            sql = String.format("SELECT COUNT(%s) AS count FROM %s",
+                    JdbcCache.INFO_TABLE_IDENTIFIER_COLUMN,
+                    config.getString(JdbcCache.INFO_TABLE_CONFIG_KEY));
+            statement = connection.prepareStatement(sql);
+            resultSet = statement.executeQuery();
+            resultSet.next();
+            assertEquals(0, resultSet.getInt("count"));
+        }
     }
 
-    public void testFlushWithOperations() throws Exception {
+    /* purge(Identifier) */
+
+    public void testPurgeWithIdentifier() throws Exception {
+        Configuration config = Application.getConfiguration();
+
+        Identifier id1 = new Identifier("cats");
+        instance.purge(id1);
+
+        try (Connection connection = JdbcCache.getConnection()) {
+            // assert that the images and infos were purged
+            String sql = String.format("SELECT COUNT(%s) AS count FROM %s",
+                    JdbcCache.IMAGE_TABLE_OPERATIONS_COLUMN,
+                    config.getString(JdbcCache.IMAGE_TABLE_CONFIG_KEY));
+            PreparedStatement statement = connection.prepareStatement(sql);
+            ResultSet resultSet = statement.executeQuery();
+            resultSet.next();
+            assertEquals(2, resultSet.getInt("count"));
+
+            sql = String.format("SELECT COUNT(%s) AS count FROM %s",
+                    JdbcCache.INFO_TABLE_IDENTIFIER_COLUMN,
+                    config.getString(JdbcCache.INFO_TABLE_CONFIG_KEY));
+            statement = connection.prepareStatement(sql);
+            resultSet = statement.executeQuery();
+            resultSet.next();
+            assertEquals(2, resultSet.getInt("count"));
+        }
+    }
+
+    /* purge(OperationList) */
+
+    public void testPurgeWithOperations() throws Exception {
         OperationList ops = TestUtil.newOperationList();
         ops.setIdentifier(new Identifier("cats"));
-        instance.flush(ops);
+        instance.purge(ops);
 
         Configuration config = Application.getConfiguration();
 
-        // assert that the image and info were flushed
-        String sql = String.format("SELECT COUNT(%s) AS count FROM %s",
-                JdbcCache.IMAGE_TABLE_OPERATIONS_COLUMN,
-                config.getString(JdbcCache.IMAGE_TABLE_CONFIG_KEY));
-        PreparedStatement statement = JdbcCache.getConnection().prepareStatement(sql);
-        ResultSet resultSet = statement.executeQuery();
-        resultSet.next();
-        assertEquals(2, resultSet.getInt("count"));
+        try (Connection connection = JdbcCache.getConnection()) {
+            // assert that the image and info were purged
+            String sql = String.format("SELECT COUNT(%s) AS count FROM %s",
+                    JdbcCache.IMAGE_TABLE_OPERATIONS_COLUMN,
+                    config.getString(JdbcCache.IMAGE_TABLE_CONFIG_KEY));
+            PreparedStatement statement = connection.prepareStatement(sql);
+            ResultSet resultSet = statement.executeQuery();
+            resultSet.next();
+            assertEquals(2, resultSet.getInt("count"));
 
-        sql = String.format("SELECT COUNT(%s) AS count FROM %s",
-                JdbcCache.INFO_TABLE_IDENTIFIER_COLUMN,
-                config.getString(JdbcCache.INFO_TABLE_CONFIG_KEY));
-        statement = JdbcCache.getConnection().prepareStatement(sql);
-        resultSet = statement.executeQuery();
-        resultSet.next();
-        assertEquals(2, resultSet.getInt("count"));
+            sql = String.format("SELECT COUNT(%s) AS count FROM %s",
+                    JdbcCache.INFO_TABLE_IDENTIFIER_COLUMN,
+                    config.getString(JdbcCache.INFO_TABLE_CONFIG_KEY));
+            statement = connection.prepareStatement(sql);
+            resultSet = statement.executeQuery();
+            resultSet.next();
+            assertEquals(2, resultSet.getInt("count"));
+        }
     }
 
-    public void testFlushExpired() throws Exception {
+    /* purgeExpired() */
+
+    public void testPurgeExpired() throws Exception {
         Application.getConfiguration().setProperty(JdbcCache.TTL_CONFIG_KEY, 1);
 
         // wait for the seed data to invalidate
@@ -196,25 +237,27 @@ public class JdbcCacheTest extends CantaloupeTestCase {
         os.close();
         instance.putDimension(new Identifier("bees"), new Dimension(50, 40));
 
-        instance.flushExpired();
+        instance.purgeExpired();
 
-        // assert that only the expired images and infos were flushed
-        Configuration config = Application.getConfiguration();
-        String sql = String.format("SELECT COUNT(%s) AS count FROM %s",
-                JdbcCache.IMAGE_TABLE_OPERATIONS_COLUMN,
-                config.getString(JdbcCache.IMAGE_TABLE_CONFIG_KEY));
-        PreparedStatement statement = JdbcCache.getConnection().prepareStatement(sql);
-        ResultSet resultSet = statement.executeQuery();
-        resultSet.next();
-        assertEquals(1, resultSet.getInt("count"));
+        try (Connection connection = JdbcCache.getConnection()) {
+            // assert that only the expired images and infos were purged
+            Configuration config = Application.getConfiguration();
+            String sql = String.format("SELECT COUNT(%s) AS count FROM %s",
+                    JdbcCache.IMAGE_TABLE_OPERATIONS_COLUMN,
+                    config.getString(JdbcCache.IMAGE_TABLE_CONFIG_KEY));
+            PreparedStatement statement = connection.prepareStatement(sql);
+            ResultSet resultSet = statement.executeQuery();
+            resultSet.next();
+            assertEquals(1, resultSet.getInt("count"));
 
-        sql = String.format("SELECT COUNT(%s) AS count FROM %s",
-                JdbcCache.IMAGE_TABLE_OPERATIONS_COLUMN,
-                config.getString(JdbcCache.IMAGE_TABLE_CONFIG_KEY));
-        statement = JdbcCache.getConnection().prepareStatement(sql);
-        resultSet = statement.executeQuery();
-        resultSet.next();
-        assertEquals(1, resultSet.getInt("count"));
+            sql = String.format("SELECT COUNT(%s) AS count FROM %s",
+                    JdbcCache.IMAGE_TABLE_OPERATIONS_COLUMN,
+                    config.getString(JdbcCache.IMAGE_TABLE_CONFIG_KEY));
+            statement = connection.prepareStatement(sql);
+            resultSet = statement.executeQuery();
+            resultSet.next();
+            assertEquals(1, resultSet.getInt("count"));
+        }
     }
 
     public void testGetDimensionWithZeroTtl() throws IOException {

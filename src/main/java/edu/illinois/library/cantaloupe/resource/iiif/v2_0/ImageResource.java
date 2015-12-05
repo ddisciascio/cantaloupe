@@ -18,7 +18,9 @@ import edu.illinois.library.cantaloupe.resolver.ResolverFactory;
 import edu.illinois.library.cantaloupe.resolver.StreamResolver;
 import edu.illinois.library.cantaloupe.resource.AbstractResource;
 import edu.illinois.library.cantaloupe.resource.CachedImageRepresentation;
+import edu.illinois.library.cantaloupe.resource.EndpointDisabledException;
 import edu.illinois.library.cantaloupe.resource.ImageRepresentation;
+import edu.illinois.library.cantaloupe.resource.PayloadTooLargeException;
 import org.restlet.data.MediaType;
 import org.restlet.representation.OutputRepresentation;
 import org.restlet.resource.Get;
@@ -28,6 +30,7 @@ import org.slf4j.LoggerFactory;
 
 import java.awt.Dimension;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.util.Map;
 import java.util.Set;
@@ -44,6 +47,10 @@ public class ImageResource extends AbstractResource {
 
     @Override
     protected void doInit() throws ResourceException {
+        if (!Application.getConfiguration().
+                getBoolean("endpoint.iiif.2.0.enabled", true)) {
+            throw new EndpointDisabledException();
+        }
         super.doInit();
         getResponseCacheDirectives().addAll(getCacheDirectives());
     }
@@ -51,7 +58,7 @@ public class ImageResource extends AbstractResource {
     /**
      * Responds to IIIF Image requests.
      *
-     * @return ImageRepresentation
+     * @return OutputRepresentation
      * @throws Exception
      */
     @Get
@@ -86,8 +93,20 @@ public class ImageResource extends AbstractResource {
 
         Resolver resolver = ResolverFactory.getResolver();
         // Determine the format of the source image
-        SourceFormat sourceFormat = resolver.
-                getSourceFormat(ops.getIdentifier());
+        SourceFormat sourceFormat = SourceFormat.UNKNOWN;
+        try {
+            sourceFormat = resolver.getSourceFormat(ops.getIdentifier());
+        } catch (FileNotFoundException e) {
+            if (Application.getConfiguration().
+                    getBoolean(PURGE_MISSING_CONFIG_KEY, false)) {
+                // if the image was not found, purge it from the cache
+                final Cache cache = CacheFactory.getInstance();
+                if (cache != null) {
+                    cache.purge(ops.getIdentifier());
+                }
+            }
+            throw e;
+        }
         if (sourceFormat.equals(SourceFormat.UNKNOWN)) {
             throw new UnsupportedSourceFormatException();
         }
@@ -109,8 +128,24 @@ public class ImageResource extends AbstractResource {
 
         this.addLinkHeader(params);
 
-        MediaType mediaType = new MediaType(
+        return getRepresentation(ops, sourceFormat, resolver, proc);
+    }
+
+    private void addLinkHeader(Parameters params) {
+        this.addHeader("Link", String.format("<%s%s/%s>;rel=\"canonical\"",
+                getPublicRootRef().toString(),
+                ImageServerApplication.IIIF_2_0_PATH, params.toString()));
+    }
+
+    private OutputRepresentation getRepresentation(OperationList ops,
+                                                   SourceFormat sourceFormat,
+                                                   Resolver resolver,
+                                                   Processor proc)
+            throws Exception {
+        final MediaType mediaType = new MediaType(
                 ops.getOutputFormat().getMediaType());
+        final long maxAllowedSize = Application.getConfiguration().
+                getLong("max_pixels", 0);
 
         // FileResolver -> StreamProcessor: OK, using FileInputStream
         // FileResolver -> FileProcessor: OK, using File
@@ -127,32 +162,39 @@ public class ImageResource extends AbstractResource {
                 proc instanceof FileProcessor) {
             logger.debug("Using {} as a FileProcessor",
                     proc.getClass().getSimpleName());
-            File inputFile = ((FileResolver) resolver).
+            final FileProcessor fproc = (FileProcessor) proc;
+            final File inputFile = ((FileResolver) resolver).
                     getFile(ops.getIdentifier());
-            return new ImageRepresentation(mediaType, sourceFormat, ops,
-                    inputFile);
+            final Dimension fullSize = fproc.getSize(inputFile, sourceFormat);
+            final Dimension effectiveSize = ops.getResultingSize(fullSize);
+            if (maxAllowedSize > 0 &&
+                    effectiveSize.width * effectiveSize.height > maxAllowedSize) {
+                throw new PayloadTooLargeException();
+            }
+            return new ImageRepresentation(mediaType, sourceFormat, fullSize,
+                    ops, inputFile);
         } else if (resolver instanceof StreamResolver) {
             logger.debug("Using {} as a StreamProcessor",
                     proc.getClass().getSimpleName());
-            StreamResolver sres = (StreamResolver) resolver;
+            final StreamResolver sres = (StreamResolver) resolver;
             if (proc instanceof StreamProcessor) {
-                StreamProcessor sproc = (StreamProcessor) proc;
+                final StreamProcessor sproc = (StreamProcessor) proc;
                 InputStream inputStream = sres.
                         getInputStream(ops.getIdentifier());
-                Dimension fullSize = sproc.getSize(inputStream, sourceFormat);
+                final Dimension fullSize = sproc.getSize(inputStream,
+                        sourceFormat);
+                final Dimension effectiveSize = ops.getResultingSize(fullSize);
+                if (maxAllowedSize > 0 &&
+                        effectiveSize.width * effectiveSize.height > maxAllowedSize) {
+                    throw new PayloadTooLargeException();
+                }
                 // avoid reusing the stream
                 inputStream = sres.getInputStream(ops.getIdentifier());
-                return new ImageRepresentation(mediaType, sourceFormat, fullSize,
-                        ops, inputStream);
+                return new ImageRepresentation(mediaType, sourceFormat,
+                        fullSize, ops, inputStream);
             }
         }
-        return null; // this should never happen
-    }
-
-    private void addLinkHeader(Parameters params) {
-        this.addHeader("Link", String.format("<%s%s/%s>;rel=\"canonical\"",
-                getPublicRootRef().toString(),
-                ImageServerApplication.IIIF_2_0_PATH, params.toString()));
+        return null; // should never happen
     }
 
 }
