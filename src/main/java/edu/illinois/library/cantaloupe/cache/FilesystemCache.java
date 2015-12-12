@@ -75,7 +75,7 @@ class FilesystemCache implements Cache {
      * Returned by {@link FilesystemCache#getImageOutputStream} when an
      * output stream for the same operation list has been returned in another
      * thread but has not yet been closed. Allows that thread to keep writing
-     * without the current thread interfering.
+     * without other threads interfering.
      */
     private static class ConcurrentNullOutputStream extends OutputStream {
 
@@ -123,6 +123,9 @@ class FilesystemCache implements Cache {
     private static final Logger logger = LoggerFactory.
             getLogger(FilesystemCache.class);
 
+    public static final String PATHNAME_CONFIG_KEY = "FilesystemCache.pathname";
+    public static final String TTL_CONFIG_KEY = "FilesystemCache.ttl_seconds";
+
     /**
      * @see <a href="https://en.wikipedia.org/wiki/Filename#Comparison_of_filename_limitations">
      *     Comparison of filename limitations</a>
@@ -131,7 +134,6 @@ class FilesystemCache implements Cache {
     private static final String IMAGE_FOLDER = "image";
     private static final String INFO_FOLDER = "info";
     private static final String INFO_EXTENSION = ".json";
-    private static final String PATHNAME_CONFIG_KEY = "FilesystemCache.pathname";
 
     private static final ObjectMapper infoMapper = new ObjectMapper();
 
@@ -161,12 +163,8 @@ class FilesystemCache implements Cache {
     /** Lock object for synchronization */
     private final Object lock4 = new Object();
 
-    private static String filenameSafe(Identifier identifier) {
-        return identifier.toString().replaceAll(FILENAME_SAFE_CHARACTERS, "_");
-    }
-
-    private static String filenameSafe(Operation op) {
-        return op.toString().replaceAll(FILENAME_SAFE_CHARACTERS, "_");
+    private static String filenameSafe(String inputString) {
+        return inputString.replaceAll(FILENAME_SAFE_CHARACTERS, "_");
     }
 
     /**
@@ -178,7 +176,7 @@ class FilesystemCache implements Cache {
 
     /**
      * @return Pathname of the image cache folder, or null if
-     * <code>FilesystemCache.pathname</code> is not set.
+     * {@link #PATHNAME_CONFIG_KEY} is not set.
      */
     private static String getImagePathname() {
         final String pathname = getCachePathname();
@@ -190,7 +188,7 @@ class FilesystemCache implements Cache {
 
     /**
      * @return Pathname of the info cache folder, or null if
-     * <code>FilesystemCache.pathname</code> is not set.
+     * {@link #PATHNAME_CONFIG_KEY} is not set.
      */
     private static String getInfoPathname() {
         final String pathname = getCachePathname();
@@ -202,7 +200,7 @@ class FilesystemCache implements Cache {
 
     private static boolean isExpired(File file) {
         final long ttlMsec = 1000 * Application.getConfiguration().
-                getLong("FilesystemCache.ttl_seconds", 0);
+                getLong(TTL_CONFIG_KEY, 0);
         return (ttlMsec > 0) && file.isFile() &&
                 System.currentTimeMillis() - file.lastModified() >= ttlMsec;
     }
@@ -233,7 +231,6 @@ class FilesystemCache implements Cache {
                     logger.debug("Deleting stale cache file: {}",
                             cacheFile.getName());
                     if (!cacheFile.delete()) {
-                        // TODO: should this be an IOException?
                         logger.error("Unable to delete {}", cacheFile);
                     }
                 }
@@ -249,14 +246,14 @@ class FilesystemCache implements Cache {
     /**
      * @param identifier
      * @return File corresponding to the given parameters, or null if
-     * <code>FilesystemCache.pathname</code> is not set in the configuration.
+     * {@link #PATHNAME_CONFIG_KEY} is not set.
      */
     public File getDimensionFile(Identifier identifier) {
         final String cachePathname = getInfoPathname();
         if (cachePathname != null) {
             final String pathname =
                     StringUtils.stripEnd(cachePathname, File.separator) +
-                            File.separator + filenameSafe(identifier) +
+                            File.separator + filenameSafe(identifier.toString()) +
                             INFO_EXTENSION;
             return new File(pathname);
         }
@@ -266,17 +263,17 @@ class FilesystemCache implements Cache {
     /**
      * @param ops
      * @return File corresponding to the given operation list, or null if
-     * <code>FilesystemCache.pathname</code> is not set in the configuration.
+     * {@link #PATHNAME_CONFIG_KEY} is not set.
      */
     public File getImageFile(OperationList ops) {
         final String cachePathname = getImagePathname();
         if (cachePathname != null) {
             List<String> parts = new ArrayList<>();
             parts.add(StringUtils.stripEnd(cachePathname, File.separator) +
-                    File.separator + filenameSafe(ops.getIdentifier()));
+                    File.separator + filenameSafe(ops.getIdentifier().toString()));
             for (Operation op : ops) {
                 if (!op.isNoOp()) {
-                    parts.add(filenameSafe(op));
+                    parts.add(filenameSafe(op.toString()));
                 }
             }
             final String baseName = StringUtils.join(parts, "_");
@@ -300,7 +297,7 @@ class FilesystemCache implements Cache {
             }
 
             public boolean accept(File dir, String name) {
-                return name.startsWith(filenameSafe(identifier));
+                return name.startsWith(filenameSafe(identifier.toString()));
             }
         }
 
@@ -325,7 +322,6 @@ class FilesystemCache implements Cache {
                 logger.debug("Deleting stale cache file: {}",
                         cacheFile.getName());
                 if (!cacheFile.delete()) {
-                    // TODO: should this be an IOException?
                     logger.error("Unable to delete {}", cacheFile);
                 }
             }
@@ -357,7 +353,8 @@ class FilesystemCache implements Cache {
     @Override
     public void purge() throws IOException {
         synchronized (lock4) {
-            while (purgingInProgress.get() || !imagesBeingPurged.isEmpty()) {
+            while (purgingInProgress.get() || !imagesBeingPurged.isEmpty() ||
+                    !imagesBeingWritten.isEmpty()) {
                 try {
                     lock4.wait();
                 } catch (InterruptedException e) {
@@ -411,6 +408,7 @@ class FilesystemCache implements Cache {
 
     @Override
     public void purge(Identifier identifier) throws IOException {
+        // TODO: improve concurrency
         for (File imageFile : getImageFiles(identifier)) {
             logger.debug("Deleting {}", imageFile);
             if (!imageFile.delete()) {
@@ -429,7 +427,8 @@ class FilesystemCache implements Cache {
     @Override
     public void purge(OperationList ops) throws IOException {
         synchronized (lock1) {
-            while (purgingInProgress.get() || imagesBeingPurged.contains(ops)) {
+            while (purgingInProgress.get() || imagesBeingPurged.contains(ops) ||
+                    imagesBeingWritten.contains(ops)) {
                 try {
                     lock1.wait();
                 } catch (InterruptedException e) {
@@ -461,7 +460,8 @@ class FilesystemCache implements Cache {
     @Override
     public void purgeExpired() throws IOException {
         synchronized (lock4) {
-            while (purgingInProgress.get() || !imagesBeingPurged.isEmpty()) {
+            while (purgingInProgress.get() || !imagesBeingPurged.isEmpty() ||
+                    !imagesBeingWritten.isEmpty()) {
                 try {
                     lock4.wait();
                 } catch (InterruptedException e) {

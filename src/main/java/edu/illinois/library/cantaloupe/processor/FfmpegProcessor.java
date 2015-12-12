@@ -36,6 +36,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Processor that uses the ffmpeg command-line tool to extract video frames,
@@ -74,6 +76,9 @@ class FfmpegProcessor implements FileProcessor {
             SUPPORTED_IIIF_1_1_QUALITIES = new HashSet<>();
     private static final Set<edu.illinois.library.cantaloupe.resource.iiif.v2_0.Quality>
             SUPPORTED_IIIF_2_0_QUALITIES = new HashSet<>();
+
+    private static final ExecutorService executorService =
+            Executors.newCachedThreadPool();
 
     static {
         SUPPORTED_IIIF_1_1_QUALITIES.add(
@@ -189,68 +194,6 @@ class FfmpegProcessor implements FileProcessor {
         }
     }
 
-    public Dimension getSize(InputStream inputStream, SourceFormat sourceFormat)
-            throws ProcessorException {
-        if (getAvailableOutputFormats(sourceFormat).size() < 1) {
-            throw new UnsupportedSourceFormatException(sourceFormat);
-        }
-
-        final List<String> command = new ArrayList<>();
-        // ffprobe -v quiet -print_format xml -show_streams pipe: < <file>
-        command.add(getPath("ffprobe"));
-        command.add("-v");
-        command.add("quiet");
-        command.add("-print_format");
-        command.add("xml");
-        command.add("-show_streams");
-        command.add("pipe:");
-
-        final ByteArrayOutputStream outputBucket = new ByteArrayOutputStream();
-        final ByteArrayOutputStream errorBucket = new ByteArrayOutputStream();
-        try {
-            final ProcessBuilder pb = new ProcessBuilder(command);
-
-            logger.debug("Executing {}", StringUtils.join(pb.command(), " "));
-            final Process process = pb.start();
-
-            new Thread(new StreamCopier(process.getInputStream(), outputBucket)).start();
-            new Thread(new StreamCopier(process.getErrorStream(), errorBucket)).start();
-            new StreamCopier(inputStream, process.getOutputStream()).run();
-
-            try {
-                int code = process.waitFor();
-                if (code != 0) {
-                    logger.warn("ffprobe returned with code {}", code);
-                    final String errorStr = errorBucket.toString();
-                    if (errorStr != null && errorStr.length() > 0) {
-                        throw new ProcessorException(errorStr);
-                    }
-                }
-                final ByteArrayInputStream bais = new ByteArrayInputStream(
-                        outputBucket.toByteArray());
-                DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-                DocumentBuilder db = dbf.newDocumentBuilder();
-                Document doc = db.parse(bais);
-                XPath xpath = XPathFactory.newInstance().newXPath();
-                XPathExpression expr = xpath.compile("//stream[@index=\"0\"]/@width");
-                int width = (int) Math.round((double) expr.evaluate(doc, XPathConstants.NUMBER));
-                expr = xpath.compile("//stream[@index=\"0\"]/@height");
-                int height = (int) Math.round((double) expr.evaluate(doc, XPathConstants.NUMBER));
-                return new Dimension(width, height);
-            } finally {
-                process.getInputStream().close();
-                //process.getOutputStream().close();
-                process.getErrorStream().close();
-                process.destroy();
-            }
-        } catch (SAXException e) {
-            throw new ProcessorException("Failed to parse XML. Command: " +
-                    StringUtils.join(command, " "), e);
-        } catch (Exception e) {
-            throw new ProcessorException(e.getMessage(), e);
-        }
-    }
-
     @Override
     public Set<ProcessorFeature> getSupportedFeatures(SourceFormat sourceFormat) {
         Set<ProcessorFeature> features = new HashSet<>();
@@ -302,8 +245,10 @@ class FfmpegProcessor implements FileProcessor {
             logger.debug("Executing {}", StringUtils.join(pb.command(), " "));
             final Process process = pb.start();
 
-            new Thread(new StreamCopier(process.getInputStream(), outputBucket)).start();
-            new Thread(new StreamCopier(process.getErrorStream(), errorBucket)).start();
+            executorService.submit(
+                    new StreamCopier(process.getInputStream(), outputBucket));
+            executorService.submit(
+                    new StreamCopier(process.getErrorStream(), errorBucket));
 
             try {
                 int code = process.waitFor();
@@ -333,64 +278,6 @@ class FfmpegProcessor implements FileProcessor {
         }
     }
 
-    public void process(OperationList ops, SourceFormat sourceFormat,
-                        Dimension fullSize, InputStream inputStream,
-                        OutputStream outputStream)
-            throws ProcessorException {
-        final Set<OutputFormat> availableOutputFormats =
-                getAvailableOutputFormats(sourceFormat);
-        if (getAvailableOutputFormats(sourceFormat).size() < 1) {
-            throw new UnsupportedSourceFormatException(sourceFormat);
-        } else if (!availableOutputFormats.contains(ops.getOutputFormat())) {
-            throw new UnsupportedOutputFormatException();
-        }
-
-        final ByteArrayOutputStream errorBucket = new ByteArrayOutputStream();
-        try {
-            final ProcessBuilder pb = getProcessBuilder(ops, fullSize);
-
-            logger.debug("Executing {}", StringUtils.join(pb.command(), " "));
-            final Process process = pb.start();
-
-            new Thread(new StreamCopier(process.getInputStream(), outputStream)).start();
-            new Thread(new StreamCopier(process.getErrorStream(), errorBucket)).start();
-            new StreamCopier(inputStream, process.getOutputStream()).run();
-
-            try {
-                int code = process.waitFor();
-                if (code != 0) {
-                    logger.warn("ffmpeg returned with code " + code);
-                    final String errorStr = errorBucket.toString();
-                    if (errorStr != null && errorStr.length() > 0) {
-                        throw new ProcessorException(errorStr);
-                    }
-                }
-            } finally {
-                process.getInputStream().close();
-                //process.getOutputStream().close();
-                process.getErrorStream().close();
-                process.destroy();
-            }
-        } catch (IOException | InterruptedException e) {
-            String msg = e.getMessage();
-            final String errorStr = errorBucket.toString();
-            if (errorStr != null && errorStr.length() > 0) {
-                msg += " (command output: " + msg + ")";
-            }
-            throw new ProcessorException(msg, e);
-        }
-    }
-
-    /**
-     * @param ops
-     * @param fullSize The full size of the source image
-     * @return Command string
-     */
-    private ProcessBuilder getProcessBuilder(OperationList ops,
-                                             Dimension fullSize) {
-        return getProcessBuilder(ops, fullSize, "pipe:0");
-    }
-
     /**
      * @param ops
      * @param fullSize The full size of the source image
@@ -400,19 +287,6 @@ class FfmpegProcessor implements FileProcessor {
     private ProcessBuilder getProcessBuilder(OperationList ops,
                                              Dimension fullSize,
                                              File inputFile) {
-        return getProcessBuilder(ops, fullSize,
-                quote(inputFile.getAbsolutePath()));
-    }
-
-    /**
-     * @param ops
-     * @param fullSize
-     * @param inputArg Either an absolute pathname or <code>pipe:</code>
-     * @return
-     */
-    private ProcessBuilder getProcessBuilder(OperationList ops,
-                                             Dimension fullSize,
-                                             String inputArg) {
         // ffmpeg -i pipe:0 -nostdin -v quiet -vframes 1 -an -vf [ops] -f image2pipe pipe:1 < video.mpg > out.jpg
         final List<String> command = new ArrayList<>();
         command.add(getPath("ffmpeg"));
@@ -432,7 +306,7 @@ class FfmpegProcessor implements FileProcessor {
         }
 
         command.add("-i");
-        command.add(inputArg);
+        command.add(quote(inputFile.getAbsolutePath()));
         command.add("-nostdin");
         command.add("-v");
         command.add("quiet");
