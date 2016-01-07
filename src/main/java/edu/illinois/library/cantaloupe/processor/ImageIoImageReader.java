@@ -7,6 +7,7 @@ import edu.illinois.library.cantaloupe.image.Operation;
 import edu.illinois.library.cantaloupe.image.OperationList;
 import edu.illinois.library.cantaloupe.image.Scale;
 import edu.illinois.library.cantaloupe.image.SourceFormat;
+import edu.illinois.library.cantaloupe.resolver.ChannelSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,7 +91,7 @@ class ImageIoImageReader {
      * @see #read(File, SourceFormat, OperationList, Dimension,
      * ReductionFactor, Set< ReaderHint >)
      *
-     * @param readableChannel Image channel to read.
+     * @param channelSource Source of image channels to read
      * @param sourceFormat
      * @param ops
      * @param fullSize Full size of the source image.
@@ -104,15 +105,15 @@ class ImageIoImageReader {
      * @throws IOException
      * @throws ProcessorException
      */
-    public BufferedImage read(final ReadableByteChannel readableChannel,
+    public BufferedImage read(final ChannelSource channelSource,
                               final SourceFormat sourceFormat,
                               final OperationList ops,
                               final Dimension fullSize,
                               final ReductionFactor reductionFactor,
                               final Set<ReaderHint> hints)
             throws IOException, ProcessorException {
-        return multiLevelAwareRead(readableChannel, sourceFormat, ops,
-                fullSize, reductionFactor, hints);
+        return multiLevelAwareRead(channelSource.newChannel(), sourceFormat,
+                ops, fullSize, reductionFactor, hints);
     }
 
     /**
