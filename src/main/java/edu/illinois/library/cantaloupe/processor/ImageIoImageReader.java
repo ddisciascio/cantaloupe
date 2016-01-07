@@ -32,6 +32,10 @@ class ImageIoImageReader {
 
     private static Logger logger = LoggerFactory.getLogger(Java2dUtil.class);
 
+    private static class ImageInfo {
+        public boolean hasAlpha = false;
+    }
+
     public enum ReaderHint {
         ALREADY_CROPPED
     }
@@ -41,7 +45,8 @@ class ImageIoImageReader {
      * {@link ImageIO#read}.
      *
      * @param readableChannel Image channel to read.
-     * @return RGB BufferedImage
+     * @return BufferedImage guaranteed to not be of type
+     * {@link BufferedImage#TYPE_CUSTOM}.
      * @throws IOException
      */
     public BufferedImage read(ReadableByteChannel readableChannel)
@@ -56,7 +61,7 @@ class ImageIoImageReader {
     }
 
     /**
-     * <p>Attempts to reads an image as efficiently as possible, utilizing its
+     * <p>Attempts to read an image as efficiently as possible, utilizing its
      * tile layout and/or sub-images, if possible.</p>
      *
      * <p>After reading, clients should check the reader hints to see whether
@@ -382,16 +387,15 @@ class ImageIoImageReader {
 
         BufferedImage outImage = null;
         // Copy the tile rasters into outImage
+        // TODO: use ExecutorService.newFixedThreadPool(int nThreads)
         for (int tx = tileX1, ix = 0; tx <= tileX2; tx++, ix++) {
             for (int ty = tileY1, iy = 0; ty <= tileY2; ty++, iy++) {
-                final BufferedImage tile = reader.readTile(imageIndex, tx, ty);
-                // ImageReader.readTileRaster() doesn't always work, so get a
-                // Raster from the tile BufferedImage and translate it.
-                final Raster raster = tile.getData().createTranslatedChild(
-                        ix * tileWidth - offsetX,
-                        iy * tileHeight - offsetY);
+                final ImageInfo imageInfo = new ImageInfo();
+                final Raster raster = readTile(reader, imageIndex, tx, ty,
+                        ix * tileWidth - offsetX, iy * tileHeight - offsetY,
+                        imageInfo);
                 if (ix == 0 && iy == 0) {
-                    final int outImageType = tile.getColorModel().hasAlpha() ?
+                    final int outImageType = imageInfo.hasAlpha ?
                             BufferedImage.TYPE_INT_ARGB :
                             BufferedImage.TYPE_INT_RGB;
                     outImage = new BufferedImage(
@@ -404,6 +408,30 @@ class ImageIoImageReader {
         }
         hints.add(ReaderHint.ALREADY_CROPPED);
         return outImage;
+    }
+
+    /**
+     * @param reader
+     * @param imageIndex
+     * @param tileX
+     * @param tileY
+     * @param translateX
+     * @param translateY
+     * @param imageInfo ImageInfo instance that will be populated with some
+     *                  source image info.
+     * @return
+     * @throws IOException
+     */
+    private Raster readTile(final ImageReader reader,
+                            final int imageIndex,
+                            final int tileX,
+                            final int tileY,
+                            final int translateX,
+                            final int translateY,
+                            final ImageInfo imageInfo) throws IOException {
+        final BufferedImage tile = reader.readTile(imageIndex, tileX, tileY);
+        imageInfo.hasAlpha = tile.getColorModel().hasAlpha();
+        return tile.getData().createTranslatedChild(translateX, translateY);
     }
 
 }
